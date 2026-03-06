@@ -1,0 +1,120 @@
+services:
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: nginx-proxy-manager
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "81:81"
+      - "443:443"
+      # RDP Port:
+      - "3389:3389"
+    volumes:
+      - ./nginx-proxy-manager/data:/data
+      - ./nginx-proxy-manager/letsencrypt:/etc/letsencrypt
+    labels:
+      - "diun.enable=true"
+
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: unless-stopped
+    environment:
+      - WEBSOCKET_ENABLED=true
+    volumes:
+      - ./vaultwarden:/data
+    ports:
+      - "8080:80"
+    labels:
+      - "diun.enable=true"
+
+  teslamate-db:
+    image: postgres:17-trixie
+    container_name: teslamate-db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    volumes:
+      - ./teslamate/db:/var/lib/postgresql/data
+    labels:
+      - "diun.enable=true"
+
+  teslamate:
+    image: teslamate/teslamate:latest
+    container_name: teslamate
+    restart: unless-stopped
+    depends_on:
+      - teslamate-db
+    env_file:
+      - .env
+    environment:
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - DATABASE_USER=${DB_USER}
+      - DATABASE_PASS=${DB_PASSWORD}
+      - DATABASE_NAME=${DB_NAME}
+      - DATABASE_HOST=teslamate-db
+      - MQTT_HOST=${MQTT_HOST}
+      - MQTT_USERNAME=${MQTT_USERNAME}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+      - TZ=Asia/Seoul
+    ports:
+      - "4000:4000"
+    labels:
+      - "diun.enable=true"
+
+  teslamate-grafana:
+    image: teslamate/grafana:latest
+    container_name: teslamate-grafana
+    restart: unless-stopped
+    depends_on:
+      - teslamate
+    env_file:
+      - .env
+    environment:
+      - DATABASE_USER=${DB_USER}
+      - DATABASE_PASS=${DB_PASSWORD}
+      - DATABASE_NAME=${DB_NAME}
+      - DATABASE_HOST=teslamate-db
+      - GRAFANA_PASSWD=${GF_PASSWORD}
+      - GF_SECURITY_ADMIN_USER=${GF_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD}
+      - GF_AUTH_BASIC_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - ./teslamate/grafana:/var/lib/grafana
+    ports:
+      - "5000:3000"
+    labels:
+      - "diun.enable=true"
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./portainer:/data
+    labels:
+      - "diun.enable=true"
+
+  diun:
+    image: crazymax/diun:latest
+    container_name: diun
+    command: serve
+    volumes:
+      - ./diun/data:/data
+      - ./diun/diun.yml:/diun.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      TZ: Asia/Seoul
+      LOG_LEVEL: info
+    restart: unless-stopped
+    labels:
+      - "diun.enable=true"
+

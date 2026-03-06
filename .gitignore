@@ -1,0 +1,19 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Docker runtime/cache
+*.pid
+*.sock
+
+# OS files
+.DS_Store
+
+# Editor/IDE
+.vscode/
+.idea/
