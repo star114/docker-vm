@@ -3,6 +3,17 @@
 .env.*
 !.env.example
 
+# Runtime data (persistent volumes)
+nginx-proxy-manager/data/
+nginx-proxy-manager/letsencrypt/
+vaultwarden/
+teslamate/
+portainer/
+diun/data/
+
+# Service config with potential secrets
+diun/diun.yml
+
 # Logs
 *.log
 logs/
