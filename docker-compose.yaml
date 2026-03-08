@@ -91,7 +91,7 @@ services:
       - "diun.notify_on=new"
       - "diun.sort_tags=semver"
       - "diun.max_tags=20"
-      - "diun.include_tags=^2\\.[0-9]+\\.[0-9]+$"
+      - "diun.include_tags=^3\\.[0-9]+\\.[0-9]+$"
 
   teslamate-grafana:
     image: teslamate/grafana:${TESLAMATE_GRAFANA_IMAGE_TAG}
@@ -124,7 +124,7 @@ services:
       - "diun.notify_on=new"
       - "diun.sort_tags=semver"
       - "diun.max_tags=20"
-      - "diun.include_tags=^2\\.[0-9]+\\.[0-9]+$"
+      - "diun.include_tags=^3\\.[0-9]+\\.[0-9]+$"
 
   portainer:
     image: portainer/portainer-ce:${PORTAINER_IMAGE_TAG}

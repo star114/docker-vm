@@ -10,6 +10,7 @@ vaultwarden/
 teslamate/
 portainer/
 diun/data/
+diun-major/data/
 backups/
 
 # Logs
