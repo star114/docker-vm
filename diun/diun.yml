@@ -1,0 +1,19 @@
+watch:
+  workers: 10
+  schedule: "0 */6 * * *"
+  firstCheckNotif: false
+
+providers:
+  docker:
+    watchByDefault: false
+
+notif:
+  telegram:
+    disableNotification: false
+    templateBody: |
+      *Routine image update*
+      *Image:* {{ if .Entry.Image.HubLink }}[{{ .Entry.Image }}]({{ .Entry.Image.HubLink }}){{ else }}{{ .Entry.Image }}{{ end }}
+      *Signal:* {{ if (eq .Entry.Status "new") }}A new approved-line tag is available{{ else }}The pinned tag digest changed{{ end }}
+      *Source:* {{ escapeMarkdown .Entry.Provider }}
+      *Host:* {{ escapeMarkdown .Meta.Hostname }}
+      Review `VERSION_POLICY.md` before changing pinned tags.

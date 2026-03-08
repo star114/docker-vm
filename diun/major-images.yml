@@ -1,0 +1,61 @@
+- name: jc21/nginx-proxy-manager
+  watch_repo: true
+  notify_on:
+    - new
+  sort_tags: semver
+  max_tags: 30
+  include_tags:
+    - ^\d+\.\d+\.\d+$
+
+- name: vaultwarden/server
+  watch_repo: true
+  notify_on:
+    - new
+  sort_tags: semver
+  max_tags: 30
+  include_tags:
+    - ^\d+\.\d+\.\d+$
+
+- name: postgres
+  watch_repo: true
+  notify_on:
+    - new
+  max_tags: 30
+  include_tags:
+    - ^\d+\.\d+-trixie$
+
+- name: teslamate/teslamate
+  watch_repo: true
+  notify_on:
+    - new
+  sort_tags: semver
+  max_tags: 30
+  include_tags:
+    - ^\d+\.\d+\.\d+$
+
+- name: teslamate/grafana
+  watch_repo: true
+  notify_on:
+    - new
+  sort_tags: semver
+  max_tags: 30
+  include_tags:
+    - ^\d+\.\d+\.\d+$
+
+- name: portainer/portainer-ce
+  watch_repo: true
+  notify_on:
+    - new
+  sort_tags: semver
+  max_tags: 30
+  include_tags:
+    - ^\d+\.\d+\.\d+$
+
+- name: crazymax/diun
+  watch_repo: true
+  notify_on:
+    - new
+  sort_tags: semver
+  max_tags: 30
+  include_tags:
+    - ^\d+\.\d+\.\d+$

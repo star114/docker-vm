@@ -1,6 +1,6 @@
 services:
   nginx-proxy-manager:
-    image: jc21/nginx-proxy-manager:latest
+    image: jc21/nginx-proxy-manager:${NPM_IMAGE_TAG}
     container_name: nginx-proxy-manager
     restart: unless-stopped
     ports:
@@ -10,28 +10,39 @@ services:
       # RDP Port:
       - "3389:3389"
     volumes:
-      - ./nginx-proxy-manager/data:/data
-      - ./nginx-proxy-manager/letsencrypt:/etc/letsencrypt
+      - ${DATA_ROOT:-.}/nginx-proxy-manager/data:/data
+      - ${DATA_ROOT:-.}/nginx-proxy-manager/letsencrypt:/etc/letsencrypt
     labels:
       - "diun.enable=true"
+      - "diun.watch_repo=true"
+      - "diun.notify_on=new"
+      - "diun.sort_tags=semver"
+      - "diun.max_tags=20"
+      - "diun.include_tags=^2\\.[0-9]+\\.[0-9]+$"
 
   vaultwarden:
-    image: vaultwarden/server:latest
+    image: vaultwarden/server:${VAULTWARDEN_IMAGE_TAG}
     container_name: vaultwarden
     restart: unless-stopped
     environment:
       - WEBSOCKET_ENABLED=true
     volumes:
-      - ./vaultwarden:/data
+      - ${DATA_ROOT:-.}/vaultwarden:/data
     ports:
       - "8080:80"
     labels:
       - "diun.enable=true"
+      - "diun.watch_repo=true"
+      - "diun.notify_on=new"
+      - "diun.sort_tags=semver"
+      - "diun.max_tags=20"
+      - "diun.include_tags=^1\\.[0-9]+\\.[0-9]+$"
 
   teslamate-db:
-    image: postgres:17-trixie
+    image: postgres:${POSTGRES_IMAGE_TAG}
     container_name: teslamate-db
     restart: unless-stopped
+    stop_grace_period: 1m
     env_file:
       - .env
     environment:
@@ -39,16 +50,27 @@ services:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_DB=${DB_NAME}
     volumes:
-      - ./teslamate/db:/var/lib/postgresql/data
+      - ${DATA_ROOT:-.}/teslamate/db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
     labels:
       - "diun.enable=true"
+      - "diun.watch_repo=true"
+      - "diun.notify_on=new"
+      - "diun.max_tags=20"
+      - "diun.include_tags=^17\\.[0-9]+-trixie$"
 
   teslamate:
-    image: teslamate/teslamate:latest
+    image: teslamate/teslamate:${TESLAMATE_IMAGE_TAG}
     container_name: teslamate
     restart: unless-stopped
     depends_on:
-      - teslamate-db
+      teslamate-db:
+        condition: service_healthy
     env_file:
       - .env
     environment:
@@ -65,13 +87,21 @@ services:
       - "4000:4000"
     labels:
       - "diun.enable=true"
+      - "diun.watch_repo=true"
+      - "diun.notify_on=new"
+      - "diun.sort_tags=semver"
+      - "diun.max_tags=20"
+      - "diun.include_tags=^2\\.[0-9]+\\.[0-9]+$"
 
   teslamate-grafana:
-    image: teslamate/grafana:latest
+    image: teslamate/grafana:${TESLAMATE_GRAFANA_IMAGE_TAG}
     container_name: teslamate-grafana
     restart: unless-stopped
     depends_on:
-      - teslamate
+      teslamate-db:
+        condition: service_healthy
+      teslamate:
+        condition: service_started
     env_file:
       - .env
     environment:
@@ -85,36 +115,67 @@ services:
       - GF_AUTH_BASIC_ENABLED=true
       - GF_AUTH_ANONYMOUS_ENABLED=false
     volumes:
-      - ./teslamate/grafana:/var/lib/grafana
+      - ${DATA_ROOT:-.}/teslamate/grafana:/var/lib/grafana
     ports:
       - "5000:3000"
     labels:
       - "diun.enable=true"
+      - "diun.watch_repo=true"
+      - "diun.notify_on=new"
+      - "diun.sort_tags=semver"
+      - "diun.max_tags=20"
+      - "diun.include_tags=^2\\.[0-9]+\\.[0-9]+$"
 
   portainer:
-    image: portainer/portainer-ce:latest
+    image: portainer/portainer-ce:${PORTAINER_IMAGE_TAG}
     container_name: portainer
     restart: unless-stopped
     ports:
       - "9000:9000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./portainer:/data
+      - ${DATA_ROOT:-.}/portainer:/data
     labels:
       - "diun.enable=true"
+      - "diun.watch_repo=true"
+      - "diun.notify_on=new"
+      - "diun.sort_tags=semver"
+      - "diun.max_tags=20"
+      - "diun.include_tags=^2\\.[0-9]+\\.[0-9]+$"
 
   diun:
-    image: crazymax/diun:latest
+    image: crazymax/diun:${DIUN_IMAGE_TAG}
     container_name: diun
     command: serve
     volumes:
-      - ./diun/data:/data
+      - ${DATA_ROOT:-.}/diun/data:/data
       - ./diun/diun.yml:/diun.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       TZ: Asia/Seoul
       LOG_LEVEL: info
+      DIUN_NOTIF_TELEGRAM_TOKEN: ${DIUN_TELEGRAM_BOT_TOKEN}
+      DIUN_NOTIF_TELEGRAM_CHATIDS: ${DIUN_TELEGRAM_CHAT_IDS}
     restart: unless-stopped
     labels:
       - "diun.enable=true"
+      - "diun.watch_repo=true"
+      - "diun.notify_on=new"
+      - "diun.sort_tags=semver"
+      - "diun.max_tags=20"
+      - "diun.include_tags=^4\\.[0-9]+\\.[0-9]+$"
 
+  diun-major:
+    image: crazymax/diun:${DIUN_IMAGE_TAG}
+    container_name: diun-major
+    command: serve
+    volumes:
+      - ${DATA_ROOT:-.}/diun-major/data:/data
+      - ./diun/diun-major.yml:/diun.yml:ro
+      - ./diun/major-images.yml:/major-images.yml:ro
+    environment:
+      TZ: Asia/Seoul
+      LOG_LEVEL: info
+      DIUN_NOTIF_TELEGRAM_TOKEN: ${DIUN_TELEGRAM_BOT_TOKEN}
+      DIUN_NOTIF_TELEGRAM_CHATIDS: ${DIUN_TELEGRAM_CHAT_IDS}
+    restart: unless-stopped

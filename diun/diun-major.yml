@@ -1,0 +1,19 @@
+watch:
+  workers: 10
+  schedule: "30 9 * * *"
+  firstCheckNotif: false
+
+providers:
+  file:
+    filename: /major-images.yml
+
+notif:
+  telegram:
+    disableNotification: false
+    templateBody: |
+      *Major version review*
+      *Image:* {{ if .Entry.Image.HubLink }}[{{ .Entry.Image }}]({{ .Entry.Image.HubLink }}){{ else }}{{ .Entry.Image }}{{ end }}
+      *Signal:* {{ if (eq .Entry.Status "new") }}A newer stable release line is available{{ else }}Tracked metadata changed{{ end }}
+      *Source:* {{ escapeMarkdown .Entry.Provider }}
+      *Host:* {{ escapeMarkdown .Meta.Hostname }}
+      Review release notes before changing pinned tags.

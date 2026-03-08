@@ -10,9 +10,7 @@ vaultwarden/
 teslamate/
 portainer/
 diun/data/
-
-# Service config with potential secrets
-diun/diun.yml
+backups/
 
 # Logs
 *.log
