@@ -132,6 +132,29 @@ Back up these directories regularly:
 
 Also back up `.env` securely (outside this repository).
 
+For the highest-priority runtime data (`nginx-proxy-manager`, `vaultwarden`, `.env`), the repository includes helper scripts:
+
+```bash
+./scripts/backup-runtime-config.sh
+./scripts/restore-runtime-config.sh /path/to/runtime-config_YYYYmmdd_HHMMSS.tar.gz
+```
+
+The runtime backup script:
+
+- Loads `DATA_ROOT` and `BACKUP_ROOT` from `.env`
+- Creates a timestamped tarball under `${BACKUP_ROOT}/runtime-config`
+- Includes `nginx-proxy-manager/data`, `nginx-proxy-manager/letsencrypt`, `vaultwarden`, and `.env`
+
+The runtime restore script:
+
+- Verifies the archive structure before changing anything
+- Stops `nginx-proxy-manager` and `vaultwarden`
+- Replaces the extracted data under `DATA_ROOT`
+- Restores `.env`
+- Starts the affected services again
+
+Warning: runtime restore replaces the current contents of those paths.
+
 ## Data Migration To DATA_ROOT
 
 If you already have data in repo-relative directories, migrate it before enabling `DATA_ROOT` in production.
