@@ -1,22 +1,31 @@
 # docker-vm
 
 Docker Compose stack for self-hosted services:
+
 - Nginx Proxy Manager
 - Vaultwarden
 - TeslaMate + PostgreSQL + Grafana
 - Portainer
 - Diun (Docker image update notifier)
 
+Most application images track `latest`. PostgreSQL is the exception and stays on an explicit tag because it stores TeslaMate data and major upgrades need a deliberate migration.
+
 ## Prerequisites
+
 - Docker Engine
 - Docker Compose plugin (`docker compose`)
 
 ## Quick Start
-1. Copy environment template:
+
+1. Copy the environment template:
    ```bash
    cp .env.example .env
    ```
-2. Edit `.env`, replace all placeholder secrets, and set `DATA_ROOT` to the host path that should hold persistent runtime data.
+2. Edit `.env`:
+   - Replace all placeholder secrets.
+   - Set `DATA_ROOT` to the host path for persistent runtime data.
+   - Set `BACKUP_ROOT` to the host path for backup files.
+   - Keep `POSTGRES_IMAGE_TAG` on the PostgreSQL version you intend to run.
 3. Start services:
    ```bash
    docker compose up -d
@@ -30,7 +39,43 @@ Docker Compose stack for self-hosted services:
    docker compose logs -f
    ```
 
+## Image Update Model
+
+The stack uses `latest` for these images:
+
+- `jc21/nginx-proxy-manager`
+- `vaultwarden/server`
+- `teslamate/teslamate`
+- `teslamate/grafana`
+- `portainer/portainer-ce`
+- `crazymax/diun`
+
+PostgreSQL uses the `.env` variable `POSTGRES_IMAGE_TAG`, for example:
+
+```env
+POSTGRES_IMAGE_TAG=17.9-trixie
+```
+
+Diun watches the configured image tags and sends Telegram notifications when a tag digest changes. It only notifies; it does not pull images or recreate containers.
+
+To apply image updates:
+
+```bash
+docker compose pull
+docker compose up -d
+docker compose ps
+```
+
+For TeslaMate-related updates, run a fresh PostgreSQL backup first:
+
+```bash
+./scripts/backup-teslamate-db.sh
+```
+
+See [VERSION_POLICY.md](/Users/star114/workspace/docker-vm/VERSION_POLICY.md) for the operational policy and rollback notes.
+
 ## Exposed Ports
+
 - `80` / `443`: Nginx Proxy Manager (HTTP/HTTPS)
 - `81`: Nginx Proxy Manager admin UI
 - `3389`: RDP passthrough port
@@ -40,6 +85,7 @@ Docker Compose stack for self-hosted services:
 - `9000`: Portainer
 
 ## Initial Access URLs
+
 - Nginx Proxy Manager: `http://<SERVER_IP>:81`
 - Vaultwarden: `http://<SERVER_IP>:8080`
 - TeslaMate: `http://<SERVER_IP>:4000`
@@ -47,7 +93,8 @@ Docker Compose stack for self-hosted services:
 - Portainer: `http://<SERVER_IP>:9000`
 
 ## Data Persistence
-Persistent data is mounted from `DATA_ROOT`. If `DATA_ROOT` is unset, Compose falls back to the previous repo-relative paths for compatibility.
+
+Persistent data is mounted from `DATA_ROOT`. If `DATA_ROOT` is unset, Compose falls back to repo-relative paths for compatibility.
 
 Recommended:
 
@@ -62,67 +109,79 @@ Examples under `DATA_ROOT`:
 - `${DATA_ROOT}/teslamate/db`
 - `${DATA_ROOT}/teslamate/grafana`
 - `${DATA_ROOT}/portainer`
+- `${DATA_ROOT}/diun/data`
 
-For TeslaMate PostgreSQL, do not treat `${DATA_ROOT}/teslamate/db` as the primary backup artifact while the database is running. Use the logical backup workflow below instead.
+For TeslaMate PostgreSQL, do not treat `${DATA_ROOT}/teslamate/db` as the primary backup artifact while the database is running. Use the logical backup workflow below.
 
 ## Operations
+
 Start or recreate containers:
+
 ```bash
 docker compose up -d
 ```
 
-`teslamate` and `teslamate-grafana` now wait for `teslamate-db` to become healthy before startup. PostgreSQL also gets a longer shutdown grace period to reduce abrupt-stop risk.
-
-Image tags are pinned through variables in `.env`. Update those variables deliberately instead of relying on `latest`.
-
 Check container status:
+
 ```bash
 docker compose ps
 ```
 
 Tail logs for all services:
+
 ```bash
 docker compose logs -f
 ```
 
 Restart one service:
+
 ```bash
 docker compose restart teslamate
 ```
 
-## Security Notes
-- Keep `.env` out of version control.
-- Use strong unique passwords for DB, MQTT, and Grafana credentials.
-- Restrict public access to admin endpoints (`:81`, `:9000`, `:5000`) through firewall or reverse proxy rules.
+Verify TeslaMate logs after updates:
 
-## Update Procedure
-1. Review the release notes for the image tag you want to move to.
-2. Run a fresh TeslaMate PostgreSQL backup before changing stateful images.
-3. Update the relevant `*_IMAGE_TAG` values in `.env`.
-4. Pull updated images:
-   ```bash
-   docker compose pull
-   ```
-5. Recreate containers in detached mode:
-   ```bash
-   docker compose up -d
-   ```
-6. Verify service health and logs:
-   ```bash
-   docker compose ps
-   docker compose logs --tail=100 teslamate-db teslamate teslamate-grafana
-   ```
-7. Remove unused images:
-   ```bash
-   docker image prune -f
-   ```
+```bash
+docker compose logs --tail=100 teslamate-db teslamate teslamate-grafana
+```
 
-See `VERSION_POLICY.md` for the tag sources, cadence, and rollback guidance.
+Remove unused images after validation:
 
-`diun/diun.yml` is configured for routine Telegram notifications and `diun/diun-major.yml` is configured for major-version review notifications. Set `DIUN_TELEGRAM_BOT_TOKEN` and `DIUN_TELEGRAM_CHAT_IDS` in `.env` before starting either watcher.
+```bash
+docker image prune -f
+```
+
+`teslamate` and `teslamate-grafana` wait for `teslamate-db` to become healthy before startup. PostgreSQL also gets a longer shutdown grace period to reduce abrupt-stop risk.
+
+## Diun Notifications
+
+Diun is configured through [diun.yml](/Users/star114/workspace/docker-vm/diun/diun.yml) and Docker labels in [docker-compose.yaml](/Users/star114/workspace/docker-vm/docker-compose.yaml). Each watched service uses:
+
+```yaml
+labels:
+  - "diun.enable=true"
+  - "diun.notify_on=update"
+```
+
+This watches the actual configured tag, such as `latest` for application services or `POSTGRES_IMAGE_TAG` for PostgreSQL. The previous separate major-version watcher has been removed because the stack now follows `latest` directly for non-PostgreSQL services.
+
+Set Telegram credentials in `.env` before starting Diun:
+
+```env
+DIUN_TELEGRAM_BOT_TOKEN=123456789:replace_me
+DIUN_TELEGRAM_CHAT_IDS=123456789
+```
+
+Start or restart Diun:
+
+```bash
+docker compose up -d diun
+```
 
 ## Backup Scope
+
 Back up these directories regularly:
+
 - `${DATA_ROOT}/nginx-proxy-manager/data`
 - `${DATA_ROOT}/nginx-proxy-manager/letsencrypt`
 - `${DATA_ROOT}/vaultwarden`
@@ -130,7 +189,7 @@ Back up these directories regularly:
 - `${DATA_ROOT}/portainer`
 - `${DATA_ROOT}/diun/data`
 
-Also back up `.env` securely (outside this repository).
+Also back up `.env` securely outside this repository.
 
 For the highest-priority runtime data (`nginx-proxy-manager`, `vaultwarden`, `.env`), the repository includes helper scripts:
 
@@ -186,13 +245,13 @@ After verification, keep the old repo-relative directories only until you no lon
 
 ## TeslaMate PostgreSQL Backup
 
-The repository includes helper scripts for logical PostgreSQL backup and restore:
+The repository includes a helper script for logical PostgreSQL backups:
 
 ```bash
 ./scripts/backup-teslamate-db.sh
 ```
 
-By default the script writes to `${BACKUP_ROOT}/teslamate-db`. Set `BACKUP_ROOT` in `.env` and prefer an absolute host path outside the repository for operational backups.
+By default the script writes to `${BACKUP_ROOT}/teslamate-db`. Set `BACKUP_ROOT` in `.env` and prefer an absolute host path outside the repository.
 
 Example:
 
@@ -223,28 +282,22 @@ The restore script:
 
 Warning: restore is destructive for the current TeslaMate database contents.
 
-## Diun Notification Modes
+## Security Notes
 
-The stack now uses two Diun watchers:
-
-- `diun`: routine updates for the currently approved release line
-- `diun-major`: major-version review alerts using the file provider
-
-Start or restart both watchers:
-
-```bash
-docker compose up -d diun diun-major
-```
-
-The major watcher reads [major-images.yml](/Users/star114/workspace/docker-vm/diun/major-images.yml) and intentionally watches broader stable tag patterns so you can review major upgrades without mixing them into routine operational alerts.
+- Keep `.env` out of version control.
+- Use strong unique passwords for DB, MQTT, and Grafana credentials.
+- Restrict public access to admin endpoints (`:81`, `:9000`, `:5000`) through firewall or reverse proxy rules.
 
 ## Stop / Remove
+
 Stop:
+
 ```bash
 docker compose stop
 ```
 
 Stop and remove containers/network:
+
 ```bash
 docker compose down
 ```

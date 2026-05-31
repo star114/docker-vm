@@ -2,90 +2,90 @@
 
 ## Goal
 
-Pin image tags for stateful services, review upstream changes before upgrades, and keep rollback targets explicit.
+Use `latest` for application services while keeping PostgreSQL explicit and recoverable.
 
-## Pinned Tags
+This stack prioritizes simple operational updates:
 
-The stack uses image tag variables in `.env`:
+- Application services track their upstream `latest` tag.
+- PostgreSQL stays on `POSTGRES_IMAGE_TAG` in `.env`.
+- Diun notifies when a configured tag digest changes.
+- Updates are still applied manually with `docker compose pull` and `docker compose up -d`.
 
-- `NPM_IMAGE_TAG`
-- `VAULTWARDEN_IMAGE_TAG`
-- `POSTGRES_IMAGE_TAG`
-- `TESLAMATE_IMAGE_TAG`
-- `TESLAMATE_GRAFANA_IMAGE_TAG`
-- `PORTAINER_IMAGE_TAG`
-- `DIUN_IMAGE_TAG`
+## Image Tag Strategy
 
-## Current Recommended Values
+These services use `latest` directly in `docker-compose.yaml`:
 
-- `NPM_IMAGE_TAG=2.13.5`
-- `VAULTWARDEN_IMAGE_TAG=1.35.2`
-- `POSTGRES_IMAGE_TAG=17.9-trixie`
-- `TESLAMATE_IMAGE_TAG=2.2.0`
-- `TESLAMATE_GRAFANA_IMAGE_TAG=2.2.0`
-- `PORTAINER_IMAGE_TAG=2.33.6`
-- `DIUN_IMAGE_TAG=4.30.0`
+- Nginx Proxy Manager
+- Vaultwarden
+- TeslaMate
+- TeslaMate Grafana
+- Portainer
+- Diun
 
-## Source Notes
+PostgreSQL uses:
 
-- Nginx Proxy Manager version is based on the latest GitHub release page as of March 8, 2026.
-- Vaultwarden version is based on the latest GitHub release page as of March 8, 2026.
-- PostgreSQL version is based on the official PostgreSQL current-minor table as of March 8, 2026.
-- TeslaMate version is based on the latest TeslaMate GitHub release as of March 8, 2026.
-- TeslaMate Grafana uses the same application release line as TeslaMate. This is an inference from TeslaMate’s release packaging and image naming.
-- Portainer version is pinned to the current LTS release line as of March 8, 2026.
-- Diun version is based on the latest GitHub release page as of March 8, 2026.
+```env
+POSTGRES_IMAGE_TAG=17.9-trixie
+```
 
-## Upgrade Cadence
-
-- Security or data-corruption fixes: upgrade as soon as practical.
-- Normal application updates: review weekly, apply monthly or during a planned maintenance window.
-- PostgreSQL major upgrades: treat as a separate migration task.
-- TeslaMate upgrades: review release notes for database migration requirements before rollout.
-
-## Upgrade Workflow
-
-1. Check Diun notifications.
-2. Read the upstream release notes for the candidate version.
-3. Create or verify backups, especially TeslaMate PostgreSQL.
-4. Change only the relevant `*_IMAGE_TAG` values in `.env`.
-5. Pull and recreate the affected services.
-6. Check `docker compose ps` and service logs.
-7. Keep the previous image tag noted until validation is complete.
-
-## Rollback Guidance
-
-- Roll back by restoring the previous `*_IMAGE_TAG` values in `.env`.
-- Run `docker compose up -d` after restoring the old tags.
-- If a data migration has already been applied and the application no longer supports downgrade, restore from backup instead of forcing an image rollback.
+Keep PostgreSQL on an explicit tag unless you are intentionally planning a database upgrade.
 
 ## Diun Strategy
 
-Diun is configured in two layers:
+Diun runs one watcher using the Docker provider. Watched services opt in with labels:
 
-- `diun`: routine notifications for the current approved release line
-- `diun-major`: review notifications for wider stable-version changes, including major updates
+```yaml
+- "diun.enable=true"
+- "diun.notify_on=update"
+```
 
-Routine label strategy:
+This means Diun watches the configured image tag and notifies when that tag's digest changes.
 
-- `diun.watch_repo=true` enables repository-wide tag checks.
-- `diun.notify_on=new` reports newer matching tags.
-- `diun.include_tags` constrains alerts to the intended release line.
-- If `diun.include_tags` is omitted while `diun.watch_repo=true`, Diun evaluates all tags in the repository, only limited by `max_tags` and `exclude_tags`.
+The previous separate `diun-major` watcher is no longer needed because non-PostgreSQL services follow `latest` directly. PostgreSQL major upgrades should be reviewed manually, not discovered through automatic major-version alerts.
 
-Examples:
+Diun does not update containers automatically.
 
-- Nginx Proxy Manager: alerts on `2.x.y`
-- Vaultwarden: alerts on `1.x.y`
-- PostgreSQL: alerts on `17.x-trixie`
-- TeslaMate and TeslaMate Grafana: alerts on `2.x.y`
-- Portainer: alerts on `2.x.y`
-- Diun: alerts on `4.x.y`
+## Update Workflow
 
-This means Diun can alert on tags newer than the currently pinned tag. It does not update containers automatically.
+1. Read Diun notifications.
+2. For TeslaMate-related updates, create a fresh PostgreSQL backup:
+   ```bash
+   ./scripts/backup-teslamate-db.sh
+   ```
+3. Pull images:
+   ```bash
+   docker compose pull
+   ```
+4. Recreate containers:
+   ```bash
+   docker compose up -d
+   ```
+5. Check status and logs:
+   ```bash
+   docker compose ps
+   docker compose logs --tail=100 teslamate-db teslamate teslamate-grafana
+   ```
+6. Remove unused images after validation:
+   ```bash
+   docker image prune -f
+   ```
 
-Major review strategy:
+## PostgreSQL Upgrade Guidance
 
-- `diun-major` uses the official file provider with a curated image list.
-- Each image uses broader stable-tag regex so new major versions can be surfaced without changing the routine watcher.
-- This keeps normal operations quiet while still surfacing migration candidates.
+PostgreSQL is stateful and should not blindly follow `latest`.
+
+For minor updates within the same major version:
+
+1. Read the PostgreSQL image notes for the target tag.
+2. Run `./scripts/backup-teslamate-db.sh`.
+3. Change `POSTGRES_IMAGE_TAG` in `.env`.
+4. Pull and recreate the stack.
+5. Verify TeslaMate and Grafana.
+
+For major upgrades, treat the work as a separate migration task. Confirm TeslaMate compatibility, read PostgreSQL migration notes, and keep a tested restore path before changing the tag.
+
+## Rollback Guidance
+
+For application images using `latest`, rollback depends on Docker's local image cache or a manually selected previous tag. If you need a reliable rollback target for a service, temporarily pin that service to a known-good tag before updating.
+
+For PostgreSQL, restore the previous `POSTGRES_IMAGE_TAG` only if no incompatible data migration has occurred. If the database has been migrated and downgrade is not supported, restore from a backup instead.

@@ -1,6 +1,6 @@
 services:
   nginx-proxy-manager:
-    image: jc21/nginx-proxy-manager:${NPM_IMAGE_TAG}
+    image: jc21/nginx-proxy-manager:latest
     container_name: nginx-proxy-manager
     restart: unless-stopped
     ports:
@@ -14,14 +14,10 @@ services:
       - ${DATA_ROOT:-.}/nginx-proxy-manager/letsencrypt:/etc/letsencrypt
     labels:
       - "diun.enable=true"
-      - "diun.watch_repo=true"
-      - "diun.notify_on=new"
-      - "diun.sort_tags=semver"
-      - "diun.max_tags=20"
-      - "diun.include_tags=^2\\.[0-9]+\\.[0-9]+$"
+      - "diun.notify_on=update"
 
   vaultwarden:
-    image: vaultwarden/server:${VAULTWARDEN_IMAGE_TAG}
+    image: vaultwarden/server:latest
     container_name: vaultwarden
     restart: unless-stopped
     environment:
@@ -32,11 +28,7 @@ services:
       - "8080:80"
     labels:
       - "diun.enable=true"
-      - "diun.watch_repo=true"
-      - "diun.notify_on=new"
-      - "diun.sort_tags=semver"
-      - "diun.max_tags=20"
-      - "diun.include_tags=^1\\.[0-9]+\\.[0-9]+$"
+      - "diun.notify_on=update"
 
   teslamate-db:
     image: postgres:${POSTGRES_IMAGE_TAG}
@@ -59,13 +51,10 @@ services:
       start_period: 20s
     labels:
       - "diun.enable=true"
-      - "diun.watch_repo=true"
-      - "diun.notify_on=new"
-      - "diun.max_tags=20"
-      - "diun.include_tags=^17\\.[0-9]+-trixie$"
+      - "diun.notify_on=update"
 
   teslamate:
-    image: teslamate/teslamate:${TESLAMATE_IMAGE_TAG}
+    image: teslamate/teslamate:latest
     container_name: teslamate
     restart: unless-stopped
     depends_on:
@@ -87,14 +76,10 @@ services:
       - "4000:4000"
     labels:
       - "diun.enable=true"
-      - "diun.watch_repo=true"
-      - "diun.notify_on=new"
-      - "diun.sort_tags=semver"
-      - "diun.max_tags=20"
-      - "diun.include_tags=^3\\.[0-9]+\\.[0-9]+$"
+      - "diun.notify_on=update"
 
   teslamate-grafana:
-    image: teslamate/grafana:${TESLAMATE_GRAFANA_IMAGE_TAG}
+    image: teslamate/grafana:latest
     container_name: teslamate-grafana
     restart: unless-stopped
     depends_on:
@@ -120,14 +105,10 @@ services:
       - "5000:3000"
     labels:
       - "diun.enable=true"
-      - "diun.watch_repo=true"
-      - "diun.notify_on=new"
-      - "diun.sort_tags=semver"
-      - "diun.max_tags=20"
-      - "diun.include_tags=^3\\.[0-9]+\\.[0-9]+$"
+      - "diun.notify_on=update"
 
   portainer:
-    image: portainer/portainer-ce:${PORTAINER_IMAGE_TAG}
+    image: portainer/portainer-ce:latest
     container_name: portainer
     restart: unless-stopped
     ports:
@@ -137,14 +118,10 @@ services:
       - ${DATA_ROOT:-.}/portainer:/data
     labels:
       - "diun.enable=true"
-      - "diun.watch_repo=true"
-      - "diun.notify_on=new"
-      - "diun.sort_tags=semver"
-      - "diun.max_tags=20"
-      - "diun.include_tags=^2\\.[0-9]+\\.[0-9]+$"
+      - "diun.notify_on=update"
 
   diun:
-    image: crazymax/diun:${DIUN_IMAGE_TAG}
+    image: crazymax/diun:latest
     container_name: diun
     command: serve
     volumes:
@@ -159,23 +136,4 @@ services:
     restart: unless-stopped
     labels:
       - "diun.enable=true"
-      - "diun.watch_repo=true"
-      - "diun.notify_on=new"
-      - "diun.sort_tags=semver"
-      - "diun.max_tags=20"
-      - "diun.include_tags=^4\\.[0-9]+\\.[0-9]+$"
-
-  diun-major:
-    image: crazymax/diun:${DIUN_IMAGE_TAG}
-    container_name: diun-major
-    command: serve
-    volumes:
-      - ${DATA_ROOT:-.}/diun-major/data:/data
-      - ./diun/diun-major.yml:/diun.yml:ro
-      - ./diun/major-images.yml:/major-images.yml:ro
-    environment:
-      TZ: Asia/Seoul
-      LOG_LEVEL: info
-      DIUN_NOTIF_TELEGRAM_TOKEN: ${DIUN_TELEGRAM_BOT_TOKEN}
-      DIUN_NOTIF_TELEGRAM_CHATIDS: ${DIUN_TELEGRAM_CHAT_IDS}
-    restart: unless-stopped
+      - "diun.notify_on=update"
